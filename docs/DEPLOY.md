@@ -27,6 +27,9 @@ now generated and persisted for you.
 Coolify → **New Resource → Docker Compose**, point it at this repo and
 `docker-compose.yml`. Set the domain on the `web` service (port 8000).
 
+Use the standard Docker Compose deployment, not **Raw Compose Deployment**,
+so Coolify creates the runtime `.env` file consumed by the app containers.
+
 **Environment variables — these two, and no others are required:**
 
 | Var | Value |
@@ -40,6 +43,12 @@ Coolify → **New Resource → Docker Compose**, point it at this repo and
 `ALLOWED_HOSTS` stays in the environment rather than the UI on purpose:
 getting it wrong 400s every request *including the page that would let
 you fix it*.
+
+The base deployment intentionally does not bind-mount git credential files.
+The setup wizard generates and stores the read key and encrypts the optional
+write PAT in Postgres. Operators who manage credentials as host files can add
+their own Coolify storage mounts and set `BRAIN_GIT_SSH_KEY_PATH` or
+`BRAIN_GIT_WRITE_PAT_PATH` to the matching container paths.
 
 ### Generated for you on first boot
 
