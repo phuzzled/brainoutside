@@ -29,24 +29,25 @@ x-app: &app
   # web's 30s graceful drain and far shorter than a worker mid-SDK-run.
   # A killed worker's task is redelivered and runs (and bills) twice.
   stop_grace_period: 60s
+  # Coolify writes runtime variables to this file before Compose starts.
+  # Short syntax also works on older Compose versions used by some Coolify
+  # installations. Local installs create it from `.env.example` first.
   env_file:
-    - path: .env
-      required: false  # Coolify injects env directly; a file is optional
+    - .env
   environment: &app-env
     DJANGO_SETTINGS_MODULE: config.settings.prod
     DATABASE_URL: postgres://brain:${POSTGRES_PASSWORD:?set in Coolify}@postgres:5432/brain
+    # Keep this interpolation explicit: Coolify discovers variables from the
+    # Compose model, and prod cannot serve the configured domain without it.
+    ALLOWED_HOSTS: ${ALLOWED_HOSTS:?set in Coolify}
     REDIS_URL: redis://redis:6379/0
     BRAIN_REPO_DIR: /data/brain-repo
     BRAIN_VIEWS_DIR: /data/brain-views
     BRAIN_STATE_DIR: /data/state
-    BRAIN_GIT_SSH_KEY_PATH: /run/secrets/brain_deploy_key
   volumes:
     - brain-repo:/data/brain-repo
     - brain-views:/data/brain-views
     - brain-state:/data/state
-    # Read-only deploy key (clone/pull path). The WRITE credential (PAT)
-    # is env-injected into the worker ONLY, at M2 (grill C13).
-    - ${BRAIN_DEPLOY_KEY_FILE:-./secrets/brain_deploy_key}:/run/secrets/brain_deploy_key:ro
   depends_on:
     postgres:
       condition: service_healthy
@@ -108,19 +109,6 @@ services:
     environment:
       <<: *app-env
       MCP_LOOPBACK_HOST: mcp
-      # The write credential is mounted into the worker ONLY — the worker
-      # is the only container that pushes. `.env.example` documented this
-      # split but the mount was missing here, so following the docs set a
-      # path nothing provided and pushes silently fell back to the DB-stored
-      # credential. Leave BRAIN_GIT_WRITE_PAT_FILE unset to skip the mount
-      # and manage the PAT through /ops/settings/ instead.
-      BRAIN_GIT_WRITE_PAT_PATH: /run/secrets/brain_write_pat
-    volumes:
-      - brain-repo:/data/brain-repo
-      - brain-views:/data/brain-views
-      - brain-state:/data/state
-      - ${BRAIN_DEPLOY_KEY_FILE:-./secrets/brain_deploy_key}:/run/secrets/brain_deploy_key:ro
-      - ${BRAIN_GIT_WRITE_PAT_FILE:-./secrets/brain_write_pat}:/run/secrets/brain_write_pat:ro
     depends_on:
       postgres:
         condition: service_healthy
